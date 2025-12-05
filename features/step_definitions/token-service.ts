@@ -3,10 +3,10 @@ import { accounts } from "../../src/config";
 import { AccountBalanceQuery, AccountId, Client, Hbar, PrivateKey, Status, TokenCreateTransaction, TokenInfoQuery, TokenMintTransaction, TokenSupplyType } from "@hashgraph/sdk";
 import assert from "node:assert";
 
-const client = Client.forTestnet()
+const client = Client.forLocalNode()
 
 Given(/^A Hedera account with more than (\d+) hbar$/, async function (expectedBalance: number) {
-  const account = accounts[1]
+  const account = accounts[5]
   const MY_ACCOUNT_ID = AccountId.fromString(account.id);
   const MY_PRIVATE_KEY = PrivateKey.fromStringED25519(account.privateKey);
   client.setOperator(MY_ACCOUNT_ID, MY_PRIVATE_KEY);
@@ -15,11 +15,12 @@ Given(/^A Hedera account with more than (\d+) hbar$/, async function (expectedBa
   this.adminKey = MY_PRIVATE_KEY
   this.accountId = MY_ACCOUNT_ID
   // console.log("account Id",MY_ACCOUNT_ID.toString())
-
+  
   //Create the query request
   const query = new AccountBalanceQuery().setAccountId(MY_ACCOUNT_ID);
   const balance = await query.execute(client)
   assert.ok(balance.hbars.toBigNumber().toNumber() > expectedBalance)
+  // console.log("Balance",balance.hbars.toBigNumber().toNumber())
 
 });
 
@@ -118,19 +119,11 @@ Then(/^An attempt to mint tokens fails$/, async function () {
   const transaction = await new TokenMintTransaction()
     .setTokenId(this.tokenId)
     .setAmount(100)
-    //  .setMaxTransactionFee(new Hbar(20)) //Use when HBAR is under 10 cents
     .freezeWith(client);
 
   const signTx = await transaction.sign(this.adminKey);
-
-  // await assert.rejects(signTx.execute(client))
-  // console.log("Before execute");
-
   const txResponse = await signTx.execute(client);
-  // console.log("Before receipt");
-
-
-  //Request the receipt of the transaction
+ 
   await assert.rejects(txResponse.getReceipt(client));
 
 });
