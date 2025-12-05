@@ -1,6 +1,6 @@
 import { Given, Then, When } from "@cucumber/cucumber";
 import { accounts } from "../../src/config";
-import { AccountBalanceQuery, AccountId, Client, PrivateKey } from "@hashgraph/sdk";
+import { AccountBalanceQuery, AccountId, Client, Hbar, PrivateKey, Status,TokenCreateTransaction, TokenInfoQuery, TokenMintTransaction } from "@hashgraph/sdk";
 import assert from "node:assert";
 
 const client = Client.forTestnet()
@@ -11,7 +11,12 @@ Given(/^A Hedera account with more than (\d+) hbar$/, async function (expectedBa
   const MY_PRIVATE_KEY = PrivateKey.fromStringED25519(account.privateKey);
   client.setOperator(MY_ACCOUNT_ID, MY_PRIVATE_KEY);
 
-//Create the query request
+  // MY_PRIVATE_KEY.publicKey
+  this.adminKey = MY_PRIVATE_KEY
+  this.accountId = MY_ACCOUNT_ID
+  // MY_ACCOUNT_ID.toString()
+
+  //Create the query request
   const query = new AccountBalanceQuery().setAccountId(MY_ACCOUNT_ID);
   const balance = await query.execute(client)
   assert.ok(balance.hbars.toBigNumber().toNumber() > expectedBalance)
@@ -19,28 +24,67 @@ Given(/^A Hedera account with more than (\d+) hbar$/, async function (expectedBa
 });
 
 When(/^I create a token named Test Token \(HTT\)$/, async function () {
+  const tx = await new TokenCreateTransaction()
+    .setTokenName("Test Token")
+    .setTokenSymbol("HTT")
+    .setDecimals(2)
+    .setAdminKey(this.adminKey.publicKey)
+    .setTreasuryAccountId(this.accountId)
+    .setSupplyKey(this.adminKey.publicKey)
+    .freezeWith(client)
+  const signTx = await (await tx.sign(this.adminKey)).sign(this.adminKey);
+
+  const txResponse = await signTx.execute(client);
+  const receipt = await txResponse.getReceipt(client);
+
+  //Get the token ID from the receipt
+  this.tokenId = receipt.tokenId;
 
 });
 
-Then(/^The token has the name "([^"]*)"$/, async function () {
+Then(/^The token has the name "([^"]*)"$/, async function (tokenName: string) {
+  const q = new TokenInfoQuery({
+    tokenId: this.tokenId
+  })
+
+  const info = await q.execute(client)
+  info.treasuryAccountId?.toString()
+  assert.equal(info.name, tokenName)
+  this.info = info
 
 });
 
-Then(/^The token has the symbol "([^"]*)"$/, async function () {
-
+Then(/^The token has the symbol "([^"]*)"$/, async function (tokenSymbol: string) {
+  assert.equal(this.info.symbol, tokenSymbol)
 });
 
-Then(/^The token has (\d+) decimals$/, async function () {
-
+Then(/^The token has (\d+) decimals$/, async function (tokenDecimals: number) {
+  assert.equal(this.info.decimals, tokenDecimals)
 });
 
 Then(/^The token is owned by the account$/, async function () {
+  assert.equal(this.info.treasuryAccountId?.toString(), this.accountId.toString() )
+});
+
+Then(/^An attempt to mint (\d+) additional tokens succeeds$/, async function (mintAmount: number) {
+    const transaction = await new TokenMintTransaction()
+     .setTokenId(this.tokenId)
+     .setAmount(mintAmount)
+    //  .setMaxTransactionFee(new Hbar(20)) //Use when HBAR is under 10 cents
+     .freezeWith(client);
+
+//Sign with the supply private key of the token 
+const signTx = await transaction.sign(this.adminKey);
+
+const txResponse = await signTx.execute(client);
+
+//Request the receipt of the transaction
+const receipt = await txResponse.getReceipt(client);
+    
+assert.equal(receipt.status, Status.Success)
 
 });
 
-Then(/^An attempt to mint (\d+) additional tokens succeeds$/, async function () {
-
-});
 When(/^I create a fixed supply token named Test Token \(HTT\) with (\d+) tokens$/, async function () {
 
 });
