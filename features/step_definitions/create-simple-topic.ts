@@ -47,9 +47,6 @@ When(/^The message "([^"]*)" is published to the topic$/, async function (messag
  const tx = await new TopicMessageSubmitTransaction({ topicId: this.topicId, message }).execute(client)
  const receipt = await tx.getReceipt(client);
 
-  console.log(`receipt.status ${receipt.status}`);
-  
-
  assert.ok(receipt)
 });
 
