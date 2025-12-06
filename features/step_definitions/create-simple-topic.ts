@@ -4,13 +4,12 @@ import {
   AccountId,
   Client,
   KeyList,
-  PrivateKey, RequestType,
-  TopicCreateTransaction, TopicInfoQuery,
+  PrivateKey, 
+  TopicCreateTransaction,
   TopicMessageQuery, TopicMessageSubmitTransaction
 } from "@hashgraph/sdk";
 import { accounts } from "../../src/config";
 import assert from "node:assert";
-import ConsensusSubmitMessage = RequestType.ConsensusSubmitMessage;
 
 // Pre-configured client for test network (testnet)
 const client = Client.forTestnet()
@@ -51,12 +50,13 @@ When(/^The message "([^"]*)" is published to the topic$/, async function (messag
 });
 
 Then(/^The message "([^"]*)" is received by the topic and can be printed to the console$/, async function (message: string) {
-  await new TopicMessageQuery({ topicId: this.topicId })
+ const subscriptionHandle = await new TopicMessageQuery({ topicId: this.topicId })
     .subscribe(
       client,
-      (error) => console.log(`Error: ${error}`),
-      (message) => console.log(message.toString())
-    );
+      (error) => { console.log(`Error: ${error}`);  subscriptionHandle.unsubscribe(); },
+      (message) => {console.log(message.toString()) ; subscriptionHandle.unsubscribe();
+    });
+    
 });
 
 Given(/^A second account with more than (\d+) hbars$/, async function (expectedBalance: number) {
